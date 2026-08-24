@@ -1,0 +1,5 @@
+cuterm
+dist/
+.tmp_*/
+.DS_Store
+rsrc.syso

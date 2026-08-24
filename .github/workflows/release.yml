@@ -1,0 +1,131 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest # Apple Silicon
+            goos: darwin
+            goarch: arm64
+          # Intel Mac: Xcode clang cross-compiles CGO code to amd64 on the
+          # arm64 runner (the macos-13 Intel runner is retired).
+          - runner: macos-latest
+            goos: darwin
+            goarch: amd64
+            buildenv: GOARCH=amd64
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          check-latest: true
+
+      - name: Install system tray build dependencies (Linux)
+        if: matrix.goos == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libayatana-appindicator3-dev
+
+      # The tray requires CGO, so each platform builds natively on its own
+      # runner; build.sh handles the platform-specific ldflags and signing.
+      - name: Build
+        shell: bash
+        env:
+          GOARCH: ${{ matrix.goarch }}
+        run: ./build.sh "${{ github.ref_name }}"
+
+      - name: Package (Unix)
+        if: matrix.goos != 'windows'
+        shell: bash
+        run: |
+          cd dist
+          bin="cuterm-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          tar czf "$bin.tar.gz" "$bin"
+
+      - name: Package (.pkg)
+        if: matrix.goos == 'darwin'
+        shell: bash
+        run: ./packaging/build-pkg.sh "${{ github.ref_name }}" "${{ matrix.goarch }}"
+
+      - name: Install nfpm (Linux)
+        if: matrix.goos == 'linux'
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+      - name: Package (.deb/.rpm)
+        if: matrix.goos == 'linux'
+        shell: bash
+        run: |
+          export VERSION="${GITHUB_REF_NAME#v}"
+          export ARCH="${{ matrix.goarch }}"
+          export BIN="$PWD/dist/cuterm-${GITHUB_REF_NAME}-linux-${ARCH}"
+          nfpm package --config packaging/nfpm.yaml --packager deb --target dist/
+          nfpm package --config packaging/nfpm.yaml --packager rpm --target dist/
+
+      - name: Package (Windows)
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: |
+          $bin = "cuterm-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          Compress-Archive -Path "dist/$bin.exe" -DestinationPath "dist/$bin.zip"
+
+      - name: Package (Windows installer)
+        if: matrix.goos == 'windows'
+        shell: pwsh
+        run: |
+          choco install nsis -y
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          # choco does not put makensis on this session's PATH; call it directly
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION="$version" packaging\installer.nsi
+
+      - name: Upload release asset (Unix)
+        if: matrix.goos != 'windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          fail_on_unmatched_files: true
+
+      - name: Upload release asset (.pkg)
+        if: matrix.goos == 'darwin'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.pkg
+          fail_on_unmatched_files: true
+
+      - name: Upload release asset (.deb/.rpm)
+        if: matrix.goos == 'linux'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.deb
+            dist/*.rpm
+          fail_on_unmatched_files: true
+
+      - name: Upload release asset (Windows)
+        if: matrix.goos == 'windows'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.zip
+            dist/*-setup.exe
+          fail_on_unmatched_files: true

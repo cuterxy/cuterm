@@ -1,0 +1,400 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: #1e1e1e;
+  color: #d4d4d4;
+}
+
+#app {
+  display: flex;
+  /* Terminal overflow must never become a page scrollbar; only the xterm
+     viewport scrolls. */
+  overflow: hidden;
+}
+
+/* ---------- sidebar ---------- */
+
+#sidebar {
+  width: 260px;
+  min-width: 260px;
+  background: #252526;
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+}
+
+#sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #333;
+}
+
+#sidebar-header h1 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+#new-btn {
+  background: #0e639c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#new-btn:hover {
+  background: #1177bb;
+}
+
+#term-list {
+  list-style: none;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.term-item {
+  display: flex;
+  align-items: center;
+  padding: 9px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #2d2d2d;
+  gap: 8px;
+}
+
+.term-item:hover {
+  background: #2a2d2e;
+}
+
+.term-item.active {
+  background: #37373d;
+}
+
+.term-item .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.term-item .dot.alive {
+  background: #4ec94e;
+}
+
+.term-item .dot.dead {
+  background: #666;
+}
+
+.term-item .meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.term-item .name {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.term-item .sub {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.term-item .icon-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.term-item .icon-btn:hover {
+  background: #3a3d41;
+  color: #fff;
+}
+
+.term-item .icon-btn.close-btn:hover {
+  background: #c94a4a;
+  color: #fff;
+}
+
+#sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  font-size: 11px;
+  color: #666;
+  border-top: 1px solid #333;
+}
+
+.footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.footer-links {
+  display: flex;
+  gap: 12px;
+}
+
+#sidebar-footer a {
+  color: #4d9fd6;
+  text-decoration: none;
+}
+
+#sidebar-footer a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- config page ---------- */
+
+#config-page {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.config-card {
+  width: 380px;
+  background: #252526;
+  border: 1px solid #363638;
+  border-radius: 12px;
+  padding: 28px 28px 22px;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.45);
+}
+
+.config-card h1 {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.config-sub {
+  margin: 6px 0 22px;
+  font-size: 12px;
+  color: #888;
+}
+
+.config-field {
+  margin-bottom: 18px;
+}
+
+.config-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.config-field input,
+.config-field select {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #eee;
+  background: #1b1b1c;
+  border: 1px solid #3a3a3c;
+  border-radius: 6px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.config-field input:focus,
+.config-field select:focus {
+  outline: none;
+  border-color: #0e639c;
+  box-shadow: 0 0 0 3px rgba(14, 99, 156, 0.25);
+}
+
+/* ---------- version + autostart ---------- */
+
+.config-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+#cfg-version {
+  font-size: 12px;
+  color: #666;
+}
+
+#cfg-version:empty {
+  display: none;
+}
+
+#app-version {
+  color: #555;
+}
+
+.config-field .config-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+  font-size: 13px;
+  color: #eee;
+  cursor: pointer;
+}
+
+.config-field .config-check input {
+  width: auto;
+  padding: 0;
+  background: none;
+  border: none;
+  accent-color: #0e639c;
+  cursor: pointer;
+}
+
+.config-note {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #666;
+}
+
+#term-preview {
+  width: 100%;
+  height: 200px;
+  padding: 6px 0 0 8px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3c;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.config-save {
+  width: 100%;
+  margin-top: 4px;
+  padding: 9px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  background: #0e639c;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.config-save:hover {
+  background: #1177bb;
+}
+
+.config-save:active {
+  background: #0d5789;
+}
+
+#config-msg {
+  min-height: 18px;
+  margin-top: 12px;
+  font-size: 12px;
+  text-align: center;
+  color: #888;
+}
+
+#config-msg.ok {
+  color: #4ec94e;
+}
+
+#config-msg.error {
+  color: #e06c75;
+}
+
+.config-links {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.config-links a {
+  color: #4d9fd6;
+  text-decoration: none;
+}
+
+.config-links a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- main ---------- */
+
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#term-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Padding lives here, not on #terminal: fit() measures #terminal's height,
+     and padding on it would be miscounted into the row calculation. */
+  padding: 4px 0 0 6px;
+}
+
+#terminal {
+  flex: 1;
+  min-height: 0;
+  background: #1e1e1e;
+}
+
+/* ---------- terminal scrollbar: auto-hide ---------- */
+
+.xterm-viewport {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+  background: transparent;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+}
+
+#terminal.scrolling .xterm-viewport,
+.xterm-viewport:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
+#terminal.scrolling .xterm-viewport::-webkit-scrollbar-thumb,
+.xterm-viewport:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
+}

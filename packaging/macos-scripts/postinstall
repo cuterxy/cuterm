@@ -1,0 +1,11 @@
+#!/bin/sh
+# postinstall for the cuterm .pkg — runs as root after the payload is laid down.
+#
+# When the pkg is built on a Mac whose processes carry the (undeletable)
+# com.apple.provenance xattr, pkgbuild archives that metadata as AppleDouble
+# (._*) files in the payload. Remove them if present; a no-op otherwise.
+rm -f /usr/._local /usr/local/._bin /usr/local/bin/._cuterm /Applications/._cuterm.app
+if [ -d /Applications/cuterm.app ]; then
+  find /Applications/cuterm.app -name '._*' -delete
+fi
+exit 0

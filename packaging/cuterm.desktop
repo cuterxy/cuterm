@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=cuterm
+Comment=Shared terminal server with web UI
+Comment[zh_CN]=带 Web 界面的共享终端服务
+Exec=cuterm
+Icon=cuterm
+Terminal=false
+Categories=System;TerminalEmulator;
+StartupNotify=false
