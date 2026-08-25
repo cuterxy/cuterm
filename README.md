@@ -45,7 +45,8 @@ The system tray requires CGO, so cross-compilation is not supported — build na
 
 ```bash
 go build -o cuterm .        # native build (CGO required)
-./build.sh 1.0.0            # build the current platform's release into dist/
+go build -o cuterm-hub ./cmd/cuterm-hub   # the cuterm-hub companion app
+./build.sh 1.0.0            # build both apps' current-platform releases into dist/
 ```
 
 Requirements:
@@ -69,11 +70,51 @@ After startup, use the tray menu "Open App" to enter `http://localhost:7681` (or
 
 Changes on the settings page take effect immediately and persist to `~/.cuterm/config.json`, applied automatically on the next start; an explicit `-addr` flag takes precedence over the configured port. In daemon mode logs go to `~/.cuterm/cuterm.log`.
 
+## cuterm-hub
+
+cuterm-hub is the companion fleet manager: it connects to any number of cuterm instances ("nodes") and puts all their terminals on one page. The hub proxies REST and WebSocket traffic transparently — the nodes run stock cuterm, no agent or plugin needed.
+
+- App page at `http://localhost:7682`: terminals grouped by node; create, attach to, rename, and close terminals on any node
+- Settings page at `http://localhost:7682/config.html`: add/remove nodes (name + `host:port`), pick each node's shell, plus the listen port, UI language, launch at login, and terminal font, font size, color scheme, and scrollback lines
+- Same experience as cuterm: daemonizes on start, system tray icon (blue), bilingual UI, settings persisted to `~/.cuterm-hub/config.json`
+
+Install with the same scripts by naming the app:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cuterxy/cuterm/main/install.sh | sh -s cuterm-hub
+```
+
+```powershell
+.\install.ps1 -App cuterm-hub
+```
+
+Releases publish cuterm-hub too (same artifact names with the `cuterm-hub-` prefix: archives, `.pkg`, `.deb` / `.rpm`, `setup.exe`). Build from source:
+
+```bash
+go build -o cuterm-hub ./cmd/cuterm-hub
+```
+
+### Hub HTTP API
+
+The hub serves the same settings endpoints as cuterm (`/api/port`, `/api/appearance`, `/api/language`, `/api/autostart`, `/api/version`) and adds:
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/nodes` | List nodes with live status: `[{"id":"...","name":"...","addr":"host:7681","online":true,"version":"..."}]` |
+| POST | `/api/nodes` | Add a node, body: `{"name":"...","addr":"host:7681"}` (name optional; port defaults to 7681) |
+| PATCH | `/api/nodes/{id}` | Edit a node's name / address |
+| DELETE | `/api/nodes/{id}` | Remove a node |
+| GET/POST/PATCH/DELETE | `/api/nodes/{id}/terminals...` | Proxied verbatim to the node's own `/api/terminals...` |
+| GET/POST | `/api/nodes/{id}/shells`, `/api/nodes/{id}/shell` | Proxied to the node's shell settings |
+| GET | `/ws/nodes/{id}/terminals/{tid}` | WebSocket attach, bridged to the node |
+
 ## Architecture
 
 - `internal/terminal` — terminal session management: one PTY per terminal, output fanned out to all subscribers, 128 KB of scrollback kept for new clients to replay; two platform implementations, `pty_unix.go` (creack/pty) and `pty_windows.go` (ConPTY)
 - `internal/server` — HTTP API + WebSocket; WebSocket uses binary frames whose first byte is the type: `0` output, `1` input, `2` resize, `3` terminal exited
 - `web/` — the app page (`index.html`: terminal management + xterm.js terminal use) and the settings page (`config.html`: port, shell, font, font size, color scheme); font and theme presets live in `web/themes.js`, UI strings in English and Chinese in `web/i18n.js`; everything is embedded into the binary with `go:embed`
+- `internal/hub` — cuterm-hub's proxy server: node registry with live status, transparent REST proxying to the nodes' APIs, and a WebSocket bridge to the nodes' terminal sockets
+- `cmd/cuterm-hub` — the cuterm-hub binary: same shape as the cuterm main package (config, daemon, tray), with its own embedded web UI in `cmd/cuterm-hub/web/` and blue icon assets in `cmd/cuterm-hub/assets/`
 - The tray menu language follows the language set on the settings page and switches instantly; when unset it is chosen from the system language (`lang_unix.go` / `lang_windows.go`)
 
 ### HTTP API

@@ -60,13 +60,17 @@ jobs:
         shell: bash
         run: |
           cd dist
-          bin="cuterm-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}"
-          tar czf "$bin.tar.gz" "$bin"
+          for app in cuterm cuterm-hub; do
+            bin="$app-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+            tar czf "$bin.tar.gz" "$bin"
+          done
 
       - name: Package (.pkg)
         if: matrix.goos == 'darwin'
         shell: bash
-        run: ./packaging/build-pkg.sh "${{ github.ref_name }}" "${{ matrix.goarch }}"
+        run: |
+          ./packaging/build-pkg.sh "${{ github.ref_name }}" "${{ matrix.goarch }}" cuterm
+          ./packaging/build-pkg.sh "${{ github.ref_name }}" "${{ matrix.goarch }}" cuterm-hub
 
       - name: Install nfpm (Linux)
         if: matrix.goos == 'linux'
@@ -81,6 +85,9 @@ jobs:
           export BIN="$PWD/dist/cuterm-${GITHUB_REF_NAME}-linux-${ARCH}"
           nfpm package --config packaging/nfpm.yaml --packager deb --target dist/
           nfpm package --config packaging/nfpm.yaml --packager rpm --target dist/
+          export BIN="$PWD/dist/cuterm-hub-${GITHUB_REF_NAME}-linux-${ARCH}"
+          nfpm package --config packaging/nfpm-hub.yaml --packager deb --target dist/
+          nfpm package --config packaging/nfpm-hub.yaml --packager rpm --target dist/
 
       - name: Package (Windows)
         if: matrix.goos == 'windows'
@@ -88,6 +95,8 @@ jobs:
         run: |
           $bin = "cuterm-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}"
           Compress-Archive -Path "dist/$bin.exe" -DestinationPath "dist/$bin.zip"
+          $hub = "cuterm-hub-${{ github.ref_name }}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          Compress-Archive -Path "dist/$hub.exe" -DestinationPath "dist/$hub.zip"
 
       - name: Package (Windows installer)
         if: matrix.goos == 'windows'
@@ -97,6 +106,7 @@ jobs:
           $version = "${{ github.ref_name }}".TrimStart('v')
           # choco does not put makensis on this session's PATH; call it directly
           & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION="$version" packaging\installer.nsi
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION="$version" packaging\installer-hub.nsi
 
       - name: Upload release asset (Unix)
         if: matrix.goos != 'windows'

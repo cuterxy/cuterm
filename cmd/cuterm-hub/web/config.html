@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="cfg.title">cuterm-hub Settings</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="alternate icon" type="image/png" href="/icon-64.png">
+  <link rel="stylesheet" href="/vendor/xterm.css">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="config-page">
+    <div class="config-card">
+      <div class="config-head">
+        <h1 data-i18n="cfg.title">cuterm-hub Settings</h1>
+        <span id="cfg-version"></span>
+      </div>
+      <div class="config-sub" data-i18n="cfg.subtitle">Saved changes take effect immediately and are written to ~/.cuterm-hub/config.json</div>
+      <form id="config-form">
+        <div class="config-field">
+          <label for="lang-select" data-i18n="cfg.language">Language</label>
+          <select id="lang-select">
+            <option value="en">English</option>
+            <option value="zh-CN">简体中文</option>
+          </select>
+        </div>
+        <div class="config-field">
+          <label for="port-input" data-i18n="cfg.port">Port</label>
+          <input id="port-input" type="number" min="1" max="65535" required>
+        </div>
+        <div class="config-field" id="autostart-field" hidden>
+          <label class="config-check" for="autostart-input">
+            <input id="autostart-input" type="checkbox">
+            <span data-i18n="cfg.autostart">Launch at login</span>
+          </label>
+          <div class="config-note" data-i18n="cfg.autostartNote">Start cuterm-hub automatically when you log in</div>
+        </div>
+        <div class="config-field">
+          <label data-i18n="cfg.nodes">cuterm nodes</label>
+          <ul id="cfg-node-list"></ul>
+          <div id="node-add-row">
+            <input id="node-name-input" type="text" maxlength="100" data-i18n-ph="cfg.nodeNamePh" placeholder="name (optional)">
+            <input id="node-addr-input" type="text" data-i18n-ph="cfg.nodeAddrPh" placeholder="host:7681">
+            <button type="button" id="node-add-btn" data-i18n="cfg.addNode">Add</button>
+          </div>
+          <div class="config-note" data-i18n="cfg.nodesNote">Node changes apply immediately; the shell applies to new terminals on that node</div>
+        </div>
+        <div class="config-field">
+          <label for="font-select" data-i18n="cfg.font">Font</label>
+          <select id="font-select"></select>
+        </div>
+        <div class="config-field">
+          <label for="font-size-input" data-i18n="cfg.fontSize">Font size</label>
+          <input id="font-size-input" type="number" min="6" max="72" required>
+        </div>
+        <div class="config-field">
+          <label for="theme-select" data-i18n="cfg.theme">Color scheme</label>
+          <select id="theme-select"></select>
+        </div>
+        <div class="config-field">
+          <label for="scrollback-input" data-i18n="cfg.scrollback">Scrollback lines</label>
+          <input id="scrollback-input" type="number" min="1" max="100000" required>
+          <div class="config-note" data-i18n="cfg.scrollbackNote">Maximum lines kept for scrolling back</div>
+        </div>
+        <div class="config-field">
+          <label data-i18n="cfg.preview">Preview</label>
+          <div id="term-preview"></div>
+        </div>
+        <button class="config-save" type="submit" data-i18n="cfg.save">Save</button>
+      </form>
+      <div id="config-msg"></div>
+      <p class="config-links"><a href="/" data-i18n="cfg.openApp">Open app page →</a></p>
+    </div>
+  </div>
+  <script src="/vendor/xterm.js"></script>
+  <script src="/vendor/addon-fit.js"></script>
+  <script src="/themes.js"></script>
+  <script src="/i18n.js"></script>
+  <script src="/config.js"></script>
+</body>
+</html>

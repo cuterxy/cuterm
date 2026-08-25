@@ -8,10 +8,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
-const (
-	runKey    = `Software\Microsoft\Windows\CurrentVersion\Run`
-	valueName = "cuterm"
-)
+const runKey = `Software\Microsoft\Windows\CurrentVersion\Run`
 
 // Supported reports whether login launch can be configured here.
 func Supported() bool { return true }
@@ -23,7 +20,7 @@ func Enabled() (bool, error) {
 		return false, err
 	}
 	defer k.Close()
-	if _, _, err := k.GetStringValue(valueName); err == nil {
+	if _, _, err := k.GetStringValue(appName); err == nil {
 		return true, nil
 	} else if errors.Is(err, registry.ErrNotExist) {
 		return false, nil
@@ -45,9 +42,9 @@ func Set(enable bool) error {
 		if err != nil {
 			return err
 		}
-		return k.SetStringValue(valueName, `"`+exe+`"`)
+		return k.SetStringValue(appName, `"`+exe+`"`)
 	}
-	if err := k.DeleteValue(valueName); err != nil && !errors.Is(err, registry.ErrNotExist) {
+	if err := k.DeleteValue(appName); err != nil && !errors.Is(err, registry.ErrNotExist) {
 		return err
 	}
 	return nil

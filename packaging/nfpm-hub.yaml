@@ -1,0 +1,29 @@
+# nfpm config for the cuterm-hub Linux packages (.deb / .rpm).
+# VERSION, ARCH (amd64|arm64) and BIN (path to the built binary) are
+# expanded from the environment; the release workflow sets them.
+name: cuterm-hub
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+version_schema: semver
+maintainer: cuterxy
+description: Manage a fleet of cuterm servers from one web page
+homepage: https://github.com/cuterxy/cuterm
+license: MIT
+contents:
+  - src: ${BIN}
+    dst: /usr/bin/cuterm-hub
+    expand: true
+  - src: packaging/cuterm-hub.desktop
+    dst: /usr/share/applications/cuterm-hub.desktop
+  - src: cmd/cuterm-hub/assets/icon-256.png
+    dst: /usr/share/icons/hicolor/256x256/apps/cuterm-hub.png
+  - src: cmd/cuterm-hub/assets/icon.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/cuterm-hub.svg
+overrides:
+  deb:
+    depends:
+      - libayatana-appindicator3-1
+  rpm:
+    depends:
+      - libayatana-appindicator3

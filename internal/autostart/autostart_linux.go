@@ -9,16 +9,17 @@ import (
 )
 
 // desktopPath returns the XDG autostart entry location
-// ($XDG_CONFIG_HOME/autostart/cuterm.desktop, default ~/.config).
+// ($XDG_CONFIG_HOME/autostart/<app>.desktop, default ~/.config).
 func desktopPath() (string, error) {
+	name := appName + ".desktop"
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
-		return filepath.Join(xdg, "autostart", "cuterm.desktop"), nil
+		return filepath.Join(xdg, "autostart", name), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".config", "autostart", "cuterm.desktop"), nil
+	return filepath.Join(home, ".config", "autostart", name), nil
 }
 
 // Supported reports whether login launch can be configured here.
@@ -58,13 +59,13 @@ func Set(enable bool) error {
 	}
 	entry := fmt.Sprintf(`[Desktop Entry]
 Type=Application
-Name=cuterm
+Name=%s
 Comment=Shared terminal server with web UI
 Exec=%s
-Icon=cuterm
+Icon=%s
 Terminal=false
 X-GNOME-Autostart-enabled=true
-`, exe)
+`, appName, exe, appName)
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}

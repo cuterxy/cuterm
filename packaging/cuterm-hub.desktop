@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=cuterm-hub
+Comment=Manage a fleet of cuterm servers in one web page
+Comment[zh_CN]=在一个 Web 页面中管理多台 cuterm 服务器
+Exec=cuterm-hub
+Icon=cuterm-hub
+Terminal=false
+Categories=System;TerminalEmulator;
+StartupNotify=false

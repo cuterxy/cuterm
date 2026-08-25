@@ -8,16 +8,18 @@ import (
 	"path/filepath"
 )
 
-const label = "com.cuterxy.cuterm"
+// label returns the LaunchAgent label, derived from the app name
+// (com.cuterxy.cuterm, com.cuterxy.cuterm-hub, ...).
+func label() string { return "com.cuterxy." + appName }
 
 // plistPath returns the per-user LaunchAgent location
-// (~/Library/LaunchAgents/com.cuterxy.cuterm.plist).
+// (~/Library/LaunchAgents/<label>.plist).
 func plistPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, "Library", "LaunchAgents", label+".plist"), nil
+	return filepath.Join(home, "Library", "LaunchAgents", label()+".plist"), nil
 }
 
 // Supported reports whether login launch can be configured here.
@@ -69,7 +71,7 @@ func Set(enable bool) error {
 	<true/>
 </dict>
 </plist>
-`, label, exe)
+`, label(), exe)
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return err
 	}

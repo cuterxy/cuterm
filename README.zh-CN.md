@@ -45,7 +45,8 @@ irm https://raw.githubusercontent.com/cuterxy/cuterm/main/install.ps1 | iex
 
 ```bash
 go build -o cuterm .        # 本机构建（CGO 必需）
-./build.sh 1.0.0            # 构建当前平台发行版到 dist/
+go build -o cuterm-hub ./cmd/cuterm-hub   # 配套的 cuterm-hub 应用
+./build.sh 1.0.0            # 构建两个应用的当前平台发行版到 dist/
 ```
 
 要求：
@@ -69,11 +70,51 @@ go build -o cuterm .        # 本机构建（CGO 必需）
 
 配置页面的修改即时生效并持久化到 `~/.cuterm/config.json`，下次启动自动应用；显式使用 `-addr` 参数时优先于配置文件中的端口。后台模式的日志写入 `~/.cuterm/cuterm.log`。
 
+## cuterm-hub
+
+cuterm-hub 是配套的集群管理器：它可以连接任意多个 cuterm 实例（"节点"），把它们的终端集中到一个页面上管理。hub 对 REST 和 WebSocket 流量做透明代理——节点运行原版 cuterm 即可，无需任何插件。
+
+- 应用页面 `http://localhost:7682`：终端按节点分组展示，可在任意节点上新建、进入、重命名、关闭终端
+- 配置页面 `http://localhost:7682/config.html`：添加/删除节点（名称 + `主机:端口`）、配置每个节点的 Shell，以及监听端口、界面语言、登录时自动启动、终端字体、字号、配色方案和滚动缓冲行数
+- 与 cuterm 一致的体验：启动后转入后台、系统托盘图标（蓝色）、中英文界面，配置持久化到 `~/.cuterm-hub/config.json`
+
+用同一套脚本安装，指定应用名即可：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cuterxy/cuterm/main/install.sh | sh -s cuterm-hub
+```
+
+```powershell
+.\install.ps1 -App cuterm-hub
+```
+
+Release 同样发布 cuterm-hub 的各类包（同样的命名、加 `cuterm-hub-` 前缀：压缩包、`.pkg`、`.deb` / `.rpm`、`setup.exe`）。源码构建：
+
+```bash
+go build -o cuterm-hub ./cmd/cuterm-hub
+```
+
+### Hub HTTP API
+
+hub 提供与 cuterm 相同的设置接口（`/api/port`、`/api/appearance`、`/api/language`、`/api/autostart`、`/api/version`），并新增：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/nodes` | 列出节点及实时状态：`[{"id":"...","name":"...","addr":"主机:7681","online":true,"version":"..."}]` |
+| POST | `/api/nodes` | 添加节点，body：`{"name":"...","addr":"主机:7681"}`（name 可选；端口缺省为 7681） |
+| PATCH | `/api/nodes/{id}` | 修改节点名称 / 地址 |
+| DELETE | `/api/nodes/{id}` | 删除节点 |
+| GET/POST/PATCH/DELETE | `/api/nodes/{id}/terminals...` | 原样代理到节点自身的 `/api/terminals...` |
+| GET/POST | `/api/nodes/{id}/shells`、`/api/nodes/{id}/shell` | 代理节点的 Shell 设置 |
+| GET | `/ws/nodes/{id}/terminals/{tid}` | WebSocket 接入终端（桥接到节点） |
+
 ## 架构
 
 - `internal/terminal` — 终端会话管理：每个终端一个 PTY，输出扇出给所有订阅者，保留 128 KB 历史供新客户端回放；`pty_unix.go`（creack/pty）与 `pty_windows.go`（ConPTY）两个平台实现
 - `internal/server` — HTTP API + WebSocket；WebSocket 使用二进制帧，首字节为类型：`0` 输出、`1` 输入、`2` resize、`3` 终端已退出
 - `web/` — 应用页面（`index.html`：终端管理 + xterm.js 终端使用）与配置页面（`config.html`：修改端口、Shell、字体、字号和配色方案），字体与配色预设见 `web/themes.js`，界面文案中英文见 `web/i18n.js`，通过 `go:embed` 嵌入二进制
+- `internal/hub` — cuterm-hub 的代理服务：节点注册表与在线状态、到节点 API 的透明 REST 代理、到节点终端 WebSocket 的桥接
+- `cmd/cuterm-hub` — cuterm-hub 二进制：与 cuterm 主包结构一致（配置、后台化、托盘），内嵌 Web 界面在 `cmd/cuterm-hub/web/`，蓝色图标资源在 `cmd/cuterm-hub/assets/`
 - 托盘菜单语言跟随配置页面的语言设置并即时切换，未设置时按系统语言（`lang_unix.go` / `lang_windows.go`）选择
 
 ### HTTP API
