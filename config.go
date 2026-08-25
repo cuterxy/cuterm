@@ -18,6 +18,11 @@ type appConfig struct {
 	FontSize   int    `json:"fontSize,omitempty"`
 	Theme      string `json:"theme,omitempty"`
 	Scrollback int    `json:"scrollback,omitempty"`
+	// HubAddr is the cuterm-hub this node actively connects to (host:port).
+	// HubID is the random token sent in the hello so the hub recognizes the
+	// node across reconnects; generated once on first use.
+	HubAddr string `json:"hubAddr,omitempty"`
+	HubID   string `json:"hubID,omitempty"`
 }
 
 // configPath returns the config file location (~/.cuterm/config.json),

@@ -38,6 +38,29 @@
 
   var currentShell = null;
   var currentAppearance = null; // {fontFamily, fontSize, theme, scrollback}
+  var currentHubAddr = null; // null until GET /api/hub answers
+
+  /* ---------- cuterm-hub connection ---------- */
+
+  var hubAddrInput = document.getElementById('hub-addr-input');
+  var hubStatus = document.getElementById('hub-status');
+
+  function renderHubStatus(addr, connected) {
+    if (!addr) {
+      hubStatus.hidden = true;
+      return;
+    }
+    hubStatus.hidden = false;
+    hubStatus.textContent = connected ? t('cfg.hubConnected') : t('cfg.hubConnecting');
+  }
+
+  fetch('/api/hub').then(function (r) { return r.json(); }).then(function (h) {
+    currentHubAddr = h.addr || '';
+    hubAddrInput.value = currentHubAddr;
+    renderHubStatus(currentHubAddr, !!h.connected);
+  }).catch(function () {
+    currentHubAddr = '';
+  });
 
   /* ---------- live preview ---------- */
 
@@ -182,6 +205,8 @@
     var portChanged = String(port) !== (location.port || '');
     var shell = shellSelect.value;
     var shellChanged = shell !== currentShell;
+    var hubAddr = hubAddrInput.value.trim();
+    var hubChanged = currentHubAddr !== null && hubAddr !== currentHubAddr;
     var autostart = autostartInput.checked;
     var autostartChanged = currentAutostart !== null && autostart !== currentAutostart;
     var appearance = {
@@ -196,7 +221,7 @@
       appearance.theme !== currentAppearance.theme ||
       appearance.scrollback !== currentAppearance.scrollback;
 
-    if (!portChanged && !shellChanged && !appearanceChanged && !autostartChanged) {
+    if (!portChanged && !shellChanged && !appearanceChanged && !autostartChanged && !hubChanged) {
       say(t('cfg.unchanged'));
       return;
     }
@@ -209,12 +234,19 @@
     if (shellChanged) {
       chain = chain.then(function () { return post('/api/shell', { shell: shell }); });
     }
+    if (hubChanged) {
+      chain = chain.then(function () { return post('/api/hub', { addr: hubAddr }); });
+    }
     if (autostartChanged) {
       chain = chain.then(function () { return post('/api/autostart', { enabled: autostart }); });
     }
     chain.then(function () {
       currentShell = shell;
       currentAppearance = appearance;
+      if (hubChanged) {
+        currentHubAddr = hubAddr;
+        renderHubStatus(hubAddr, false); // reconnect happens in the background
+      }
       if (currentAutostart !== null) currentAutostart = autostart;
       if (!portChanged) {
         say(t('cfg.saved'), 'ok');

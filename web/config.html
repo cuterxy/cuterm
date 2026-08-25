@@ -29,6 +29,12 @@
           <label for="port-input" data-i18n="cfg.port">Port</label>
           <input id="port-input" type="number" min="1" max="65535" required>
         </div>
+        <div class="config-field">
+          <label for="hub-addr-input" data-i18n="cfg.hub">cuterm-hub address</label>
+          <input id="hub-addr-input" type="text" placeholder="hub.example.com:7682">
+          <div class="config-note" data-i18n="cfg.hubNote">Connect this node to a cuterm-hub; the hub picks it up automatically, even behind NAT</div>
+          <div class="config-note" id="hub-status" hidden></div>
+        </div>
         <div class="config-field" id="autostart-field" hidden>
           <label class="config-check" for="autostart-input">
             <input id="autostart-input" type="checkbox">

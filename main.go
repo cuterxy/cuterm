@@ -8,7 +8,9 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"embed"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -104,6 +106,42 @@ func main() {
 		return nil
 	}
 
+	// Reverse connection to a cuterm-hub: the client is (re)started whenever
+	// the hub address changes via the config page, and at startup if set.
+	var hubMu sync.Mutex
+	var hubC *hubClient
+	applyHub := func(addr string) error {
+		hubMu.Lock()
+		defer hubMu.Unlock()
+		if hubC != nil {
+			hubC.Stop()
+			hubC = nil
+		}
+		cfg.HubAddr = addr
+		if addr != "" {
+			if cfg.HubID == "" {
+				cfg.HubID = newHubID()
+			}
+			name, err := os.Hostname()
+			if err != nil || name == "" {
+				name = cfg.HubID
+			}
+			hubC = newHubClient(addr, cfg.HubID, name, version, svc.localAddr)
+			hubC.Start()
+		}
+		cfg.save()
+		return nil
+	}
+	api.OnHubChange = applyHub
+	api.HubStatus = func() (string, bool) {
+		hubMu.Lock()
+		defer hubMu.Unlock()
+		if hubC == nil {
+			return "", false
+		}
+		return cfg.HubAddr, hubC.Connected()
+	}
+
 	cleanup := func() {
 		mgr.CloseAll()
 		svc.Close()
@@ -120,6 +158,12 @@ func main() {
 	if err := svc.Listen(*addr); err != nil {
 		cleanup()
 		log.Fatalf("server: %v", err)
+	}
+
+	if cfg.HubAddr != "" {
+		if err := applyHub(cfg.HubAddr); err != nil {
+			log.Printf("hub %s: %v", cfg.HubAddr, err)
+		}
 	}
 
 	fmt.Printf("cuterm %s\n", version)
@@ -188,6 +232,19 @@ func (svc *httpService) URL() string {
 	return "http://localhost" + displayAddr(svc.addr)
 }
 
+// localAddr returns the loopback dial address of the active HTTP server
+// ("127.0.0.1:port"), used by the hub client to bridge tunnel connections
+// into the local API. It follows runtime port changes.
+func (svc *httpService) localAddr() string {
+	svc.mu.Lock()
+	defer svc.mu.Unlock()
+	_, port, err := net.SplitHostPort(svc.addr)
+	if err != nil {
+		return svc.addr
+	}
+	return net.JoinHostPort("127.0.0.1", port)
+}
+
 // Close shuts down the active HTTP server.
 func (svc *httpService) Close() {
 	svc.mu.Lock()
@@ -202,6 +259,16 @@ func displayAddr(addr string) string {
 		return addr
 	}
 	return ":" + addr
+}
+
+// newHubID returns the random node token sent to the hub in the hello; it
+// is generated once and persisted in the config.
+func newHubID() string {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(b)
 }
 
 // fatal prints a message to stderr and exits with a non-zero status.

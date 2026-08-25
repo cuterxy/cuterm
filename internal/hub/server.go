@@ -27,11 +27,14 @@ import (
 // errNodeNotFound is returned when no registered node matches a request ID.
 var errNodeNotFound = errors.New("node not found")
 
-// Node is a registered cuterm server.
+// Node is a registered cuterm server. A Reverse node connected to the hub
+// itself (see agent.go); its Addr is empty and all traffic rides the
+// reverse tunnel instead of a direct connection.
 type Node struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Addr string `json:"addr"` // host:port, no scheme
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Addr    string `json:"addr"` // host:port, no scheme
+	Reverse bool   `json:"reverse,omitempty"`
 }
 
 // NodeStatus is a Node plus its live reachability, as served by GET
@@ -78,6 +81,14 @@ type Server struct {
 	nodesMu sync.RWMutex
 	nodes   []Node
 
+	// sessions holds the control channels of connected reverse nodes,
+	// keyed by node ID; dials maps a dial token to the waiter expecting
+	// the node's data channel (see agent.go).
+	sessionsMu sync.RWMutex
+	sessions   map[string]*agentSession
+	dialsMu    sync.Mutex
+	dials      map[string]chan *websocket.Conn
+
 	appearanceMu sync.RWMutex
 	appearance   Appearance
 
@@ -98,9 +109,11 @@ func New(staticFS fs.FS, nodes []Node) *Server {
 			// secret is at stake beyond shell access itself.
 			CheckOrigin: func(r *http.Request) bool { return true },
 		},
-		dialer: websocket.Dialer{HandshakeTimeout: 10 * time.Second},
-		client: &http.Client{Timeout: 15 * time.Second},
-		nodes:  append([]Node(nil), nodes...),
+		dialer:   websocket.Dialer{HandshakeTimeout: 10 * time.Second},
+		client:   &http.Client{Timeout: 15 * time.Second},
+		nodes:    append([]Node(nil), nodes...),
+		sessions: make(map[string]*agentSession),
+		dials:    make(map[string]chan *websocket.Conn),
 	}
 	s.mux.Handle("GET /api/nodes", http.HandlerFunc(s.handleListNodes))
 	s.mux.Handle("POST /api/nodes", http.HandlerFunc(s.handleAddNode))
@@ -121,6 +134,8 @@ func New(staticFS fs.FS, nodes []Node) *Server {
 	s.mux.Handle("GET /api/autostart", http.HandlerFunc(s.handleGetAutostart))
 	s.mux.Handle("POST /api/autostart", http.HandlerFunc(s.handleSetAutostart))
 	s.mux.Handle("GET /ws/nodes/{id}/terminals/{tid}", http.HandlerFunc(s.handleWS))
+	s.mux.Handle("GET /ws/agent", http.HandlerFunc(s.handleAgent))
+	s.mux.Handle("GET /ws/agent/dial", http.HandlerFunc(s.handleAgentDial))
 	s.mux.Handle("GET /", http.FileServer(http.FS(staticFS)))
 	return s
 }
@@ -201,9 +216,18 @@ func (s *Server) node(id string) (Node, bool) {
 	return Node{}, false
 }
 
-// nodeStatus probes a node's /api/version with a short timeout.
+// nodeStatus probes a node's /api/version with a short timeout. A reverse
+// node needs no probe: it is online while its control channel is up, and
+// its version came with the hello.
 func (s *Server) nodeStatus(n Node) NodeStatus {
 	st := NodeStatus{Node: n}
+	if n.Reverse {
+		if sess, ok := s.agentSessionFor(n.ID); ok {
+			st.Online = true
+			st.Version = sess.version
+		}
+		return st
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+n.Addr+"/api/version", nil)
@@ -309,6 +333,11 @@ func (s *Server) handleEditNode(w http.ResponseWriter, r *http.Request) {
 	}
 	node := s.nodes[idx]
 	if req.Addr != "" {
+		if node.Reverse {
+			s.nodesMu.Unlock()
+			writeError(w, http.StatusBadRequest, errors.New("a reverse node's address is managed by the node itself"))
+			return
+		}
 		addr, err := normalizeAddr(req.Addr)
 		if err != nil {
 			s.nodesMu.Unlock()
@@ -385,6 +414,9 @@ func (s *Server) proxyToNode(w http.ResponseWriter, r *http.Request) {
 	}
 	prefix := "/api/nodes/" + node.ID
 	upstream := "http://" + node.Addr + "/api" + strings.TrimPrefix(r.URL.Path, prefix)
+	if node.Reverse {
+		upstream = "http://tunnel/api" + strings.TrimPrefix(r.URL.Path, prefix)
+	}
 	if r.URL.RawQuery != "" {
 		upstream += "?" + r.URL.RawQuery
 	}
@@ -397,10 +429,33 @@ func (s *Server) proxyToNode(w http.ResponseWriter, r *http.Request) {
 	if ct := r.Header.Get("Content-Type"); ct != "" {
 		req.Header.Set("Content-Type", ct)
 	}
-	resp, err := s.client.Do(req)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Errorf("node %s unreachable: %v", node.Addr, err))
-		return
+
+	var resp *http.Response
+	if node.Reverse {
+		// One HTTP round-trip over a fresh tunnel connection.
+		conn, err := s.dialNode(r.Context(), node.ID)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, fmt.Errorf("node %s: %v", node.Name, err))
+			return
+		}
+		tr := &http.Transport{
+			DisableKeepAlives: true,
+			DialContext: func(context.Context, string, string) (net.Conn, error) {
+				return conn, nil
+			},
+		}
+		resp, err = tr.RoundTrip(req)
+		if err != nil {
+			conn.Close()
+			writeError(w, http.StatusBadGateway, fmt.Errorf("node %s: %v", node.Name, err))
+			return
+		}
+	} else {
+		resp, err = s.client.Do(req)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, fmt.Errorf("node %s unreachable: %v", node.Addr, err))
+			return
+		}
 	}
 	defer resp.Body.Close()
 	if ct := resp.Header.Get("Content-Type"); ct != "" {
@@ -419,10 +474,33 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	upstream, _, err := s.dialer.Dial("ws://"+node.Addr+"/ws/terminals/"+r.PathValue("tid"), nil)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Errorf("node %s unreachable: %v", node.Addr, err))
-		return
+	var upstream *websocket.Conn
+	if node.Reverse {
+		// Run the WebSocket handshake over a fresh tunnel connection.
+		conn, err := s.dialNode(r.Context(), node.ID)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, fmt.Errorf("node %s: %v", node.Name, err))
+			return
+		}
+		dialer := websocket.Dialer{
+			HandshakeTimeout: 10 * time.Second,
+			NetDialContext: func(context.Context, string, string) (net.Conn, error) {
+				return conn, nil
+			},
+		}
+		upstream, _, err = dialer.Dial("ws://tunnel/ws/terminals/"+r.PathValue("tid"), nil)
+		if err != nil {
+			conn.Close()
+			writeError(w, http.StatusBadGateway, fmt.Errorf("node %s: %v", node.Name, err))
+			return
+		}
+	} else {
+		var err error
+		upstream, _, err = s.dialer.Dial("ws://"+node.Addr+"/ws/terminals/"+r.PathValue("tid"), nil)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, fmt.Errorf("node %s unreachable: %v", node.Addr, err))
+			return
+		}
 	}
 	defer upstream.Close()
 
@@ -436,8 +514,8 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	// When one direction ends (client closed, terminal exited, node gone),
 	// return and let the deferred closes unblock the other goroutine.
 	done := make(chan struct{}, 2)
-	go relayWS(upstream, downstream, done)   // node -> browser
-	go relayWS(downstream, upstream, done)   // browser -> node
+	go relayWS(upstream, downstream, done) // node -> browser
+	go relayWS(downstream, upstream, done) // browser -> node
 	<-done
 }
 

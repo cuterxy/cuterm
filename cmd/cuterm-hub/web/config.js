@@ -126,7 +126,7 @@
     name.textContent = node.name;
     var sub = document.createElement('div');
     sub.className = 'sub';
-    sub.textContent = node.addr + (node.online ? '' : ' · ' + t('node.offline'));
+    sub.textContent = (node.reverse ? t('node.reverse') : node.addr) + (node.online ? '' : ' · ' + t('node.offline'));
     meta.appendChild(name);
     meta.appendChild(sub);
 

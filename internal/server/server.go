@@ -6,8 +6,10 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -40,6 +42,15 @@ type Server struct {
 	// value is updated, so the caller can persist it and switch the tray
 	// menu language at runtime.
 	OnLanguageChange func(lang string) error
+
+	// OnHubChange is called by POST /api/hub with the validated hub address
+	// ("" means disconnect), so the caller can persist it and start or stop
+	// the reverse-tunnel client at runtime.
+	OnHubChange func(addr string) error
+
+	// HubStatus backs GET /api/hub with the configured hub address and
+	// whether the tunnel is currently connected. Nil reports empty/offline.
+	HubStatus func() (addr string, connected bool)
 
 	appearanceMu sync.RWMutex
 	appearance   Appearance
@@ -106,6 +117,8 @@ func New(staticFS fs.FS, mgr *terminal.Manager) *Server {
 	s.mux.Handle("GET /api/version", http.HandlerFunc(s.handleVersion))
 	s.mux.Handle("GET /api/autostart", http.HandlerFunc(s.handleGetAutostart))
 	s.mux.Handle("POST /api/autostart", http.HandlerFunc(s.handleSetAutostart))
+	s.mux.Handle("GET /api/hub", http.HandlerFunc(s.handleGetHub))
+	s.mux.Handle("POST /api/hub", http.HandlerFunc(s.handleSetHub))
 	s.mux.Handle("GET /ws/terminals/{id}", http.HandlerFunc(s.handleWS))
 	s.mux.Handle("GET /", http.FileServer(http.FS(staticFS)))
 	return s
@@ -363,6 +376,69 @@ func (s *Server) handleSetAutostart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := autostart.Set(req.Enabled); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+/* ---------- cuterm-hub reverse connection ---------- */
+
+func (s *Server) handleGetHub(w http.ResponseWriter, r *http.Request) {
+	var addr string
+	var connected bool
+	if s.HubStatus != nil {
+		addr, connected = s.HubStatus()
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"addr":      addr,
+		"connected": connected,
+	})
+}
+
+type hubRequest struct {
+	Addr string `json:"addr"`
+}
+
+// normalizeHubAddr validates user input like "https://host/", "host" or
+// "host:7682/" and returns a bare "host:port". A missing port defaults to
+// cuterm-hub's 7682. "" means disconnect and passes through.
+func normalizeHubAddr(raw string) (string, error) {
+	addr := strings.TrimSpace(raw)
+	addr = strings.TrimPrefix(addr, "http://")
+	addr = strings.TrimPrefix(addr, "https://")
+	addr = strings.TrimRight(addr, "/")
+	if addr == "" {
+		return "", nil
+	}
+	if strings.ContainsAny(addr, "/?#") {
+		return "", fmt.Errorf("invalid hub address: %s", raw)
+	}
+	if _, _, err := net.SplitHostPort(addr); err != nil {
+		if !strings.Contains(err.Error(), "missing port") {
+			return "", fmt.Errorf("invalid hub address: %s", raw)
+		}
+		addr = net.JoinHostPort(addr, "7682")
+	}
+	return addr, nil
+}
+
+func (s *Server) handleSetHub(w http.ResponseWriter, r *http.Request) {
+	var req hubRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	addr, err := normalizeHubAddr(req.Addr)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if s.OnHubChange == nil {
+		writeError(w, http.StatusNotImplemented, errors.New("hub connection not supported"))
+		return
+	}
+	if err := s.OnHubChange(addr); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
