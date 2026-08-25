@@ -26,6 +26,7 @@
   var session = null; // {nodeId, id, term, fitAddon, ws, closedByUs, onDetach}
   var nodes = []; // last fetched node statuses
   var termsByNode = {}; // nodeId -> last fetched terminal list
+  var collapsedNodes = {}; // nodeId -> true when the terminal list is collapsed
 
   // Terminal display settings, kept in sync with the hub config so that
   // changes made on the config page apply here without a reload.
@@ -196,8 +197,9 @@
     var head = document.createElement('div');
     head.className = 'node-head';
 
-    var dot = document.createElement('span');
-    dot.className = 'dot ' + (node.online ? 'alive' : 'dead');
+    var caret = document.createElement('span');
+    caret.className = 'caret';
+    caret.textContent = collapsedNodes[node.id] ? '▲' : '▼';
 
     var meta = document.createElement('div');
     meta.className = 'meta';
@@ -222,9 +224,13 @@
       }).catch(function (err) { window.alert(err.message); });
     });
 
-    head.appendChild(dot);
+    head.appendChild(caret);
     head.appendChild(meta);
     head.appendChild(newBtn);
+    head.addEventListener('click', function () {
+      collapsedNodes[node.id] = !collapsedNodes[node.id];
+      renderList();
+    });
     // A connected reverse node is managed from the node side; it cannot be
     // removed here (the hub API rejects it too).
     if (!(node.reverse && node.online)) {
@@ -247,7 +253,7 @@
     li.appendChild(head);
 
     var terms = termsByNode[node.id] || [];
-    if (node.online && terms.length > 0) {
+    if (!collapsedNodes[node.id] && node.online && terms.length > 0) {
       var ul = document.createElement('ul');
       ul.className = 'node-terms';
       terms.forEach(function (item) {

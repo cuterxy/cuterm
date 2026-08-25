@@ -414,21 +414,16 @@ body {
   padding: 9px 14px;
   border-bottom: 1px solid #2d2d2d;
   background: #28282b;
+  cursor: pointer;
 }
 
-.node-head .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.node-head .caret {
+  width: 12px;
+  font-size: 10px;
+  color: #888;
+  text-align: center;
   flex-shrink: 0;
-}
-
-.node-head .dot.alive {
-  background: #4ec94e;
-}
-
-.node-head .dot.dead {
-  background: #666;
+  user-select: none;
 }
 
 .node-head .meta {
