@@ -481,6 +481,71 @@ body {
   padding-left: 24px;
 }
 
+/* ---------- hub: add-node affordance in the sidebar ---------- */
+
+#sidebar-header .icon-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+#sidebar-header .icon-btn:hover {
+  background: #3a3d41;
+  color: #fff;
+}
+
+#node-add-form {
+  display: flex;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #333;
+  background: #28282b;
+}
+
+/* display:flex above would otherwise beat the hidden attribute. */
+#node-add-form[hidden] {
+  display: none;
+}
+
+#node-add-form input {
+  flex: 1;
+  min-width: 0;
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  color: #ddd;
+  font-size: 12px;
+  padding: 5px 8px;
+}
+
+#node-add-form input:focus {
+  outline: none;
+  border-color: #0e639c;
+}
+
+#node-add-form button {
+  background: #0e639c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#node-add-form button:hover {
+  background: #1177bb;
+}
+
+.node-head .icon-btn.close-btn:hover:not(:disabled) {
+  background: #a1260d;
+  color: #fff;
+}
+
 /* ---------- hub: node management on the config page ---------- */
 
 #cfg-node-list {

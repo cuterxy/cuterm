@@ -107,6 +107,30 @@
     });
   }
 
+  function addNode(name, addr) {
+    return fetch('/api/nodes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, addr: addr })
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.json().then(function (data) {
+          throw new Error(data.error || ('add failed: ' + r.status));
+        });
+      }
+    });
+  }
+
+  function removeNode(id) {
+    return fetch('/api/nodes/' + id, { method: 'DELETE' }).then(function (r) {
+      if (!r.ok) {
+        return r.json().then(function (data) {
+          throw new Error(data.error || ('remove failed: ' + r.status));
+        });
+      }
+    });
+  }
+
   /* ---------- list rendering ---------- */
 
   function renderTermItem(node, item) {
@@ -201,6 +225,25 @@
     head.appendChild(dot);
     head.appendChild(meta);
     head.appendChild(newBtn);
+    // A connected reverse node is managed from the node side; it cannot be
+    // removed here (the hub API rejects it too).
+    if (!(node.reverse && node.online)) {
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'icon-btn close-btn';
+      removeBtn.title = t('cfg.removeNodeTitle');
+      removeBtn.textContent = '×';
+      removeBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        removeNode(node.id).then(function () {
+          if (session && session.nodeId === node.id) detach();
+          delete termsByNode[node.id];
+          refresh();
+        }).catch(function (err) {
+          window.alert(t('cfg.nodeRemoveFail', { error: err.message }));
+        });
+      });
+      head.appendChild(removeBtn);
+    }
     li.appendChild(head);
 
     var terms = termsByNode[node.id] || [];
@@ -416,6 +459,33 @@
   document.getElementById('lang-toggle').addEventListener('click', function (ev) {
     ev.preventDefault();
     cutermSetLang(cutermLang() === 'zh-CN' ? 'en' : 'zh-CN');
+  });
+
+  var addToggle = document.getElementById('node-add-toggle');
+  var addForm = document.getElementById('node-add-form');
+  var addName = document.getElementById('app-node-name');
+  var addAddr = document.getElementById('app-node-addr');
+
+  addToggle.addEventListener('click', function () {
+    addForm.hidden = !addForm.hidden;
+    if (!addForm.hidden) addAddr.focus();
+  });
+
+  addForm.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var addr = addAddr.value.trim();
+    if (!addr) {
+      window.alert(t('cfg.nodeAddrRequired'));
+      return;
+    }
+    addNode(addName.value.trim(), addr).then(function () {
+      addName.value = '';
+      addAddr.value = '';
+      addForm.hidden = true;
+      refresh();
+    }).catch(function (err) {
+      window.alert(t('cfg.nodeAddFail', { error: err.message }));
+    });
   });
 
   window.addEventListener('resize', function () {

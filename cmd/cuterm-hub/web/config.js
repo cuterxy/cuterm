@@ -136,14 +136,25 @@
     removeBtn.title = t('cfg.removeNodeTitle');
     removeBtn.textContent = '×';
     removeBtn.addEventListener('click', function () {
-      fetch('/api/nodes/' + node.id, { method: 'DELETE' }).then(function () {
+      fetch('/api/nodes/' + node.id, { method: 'DELETE' }).then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (data) {
+            throw new Error(data.error || ('failed: ' + r.status));
+          });
+        }
         loadNodes();
-      }).catch(function () { /* retry on next render */ });
+      }).catch(function (err) {
+        window.alert(t('cfg.nodeRemoveFail', { error: err.message }));
+      });
     });
 
     main.appendChild(dot);
     main.appendChild(meta);
-    main.appendChild(removeBtn);
+    // A connected reverse node is managed from the node side; the hub API
+    // rejects its removal, so hide the button here too.
+    if (!(node.reverse && node.online)) {
+      main.appendChild(removeBtn);
+    }
     li.appendChild(main);
 
     // Per-node shell: proxied to the node's own /api/shells + /api/shell,

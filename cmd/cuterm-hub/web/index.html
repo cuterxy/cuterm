@@ -14,7 +14,13 @@
     <aside id="sidebar">
       <div id="sidebar-header">
         <h1>cuterm-hub</h1>
+        <button id="node-add-toggle" class="icon-btn" data-i18n-title="node.addTitle" title="Add node">+</button>
       </div>
+      <form id="node-add-form" hidden>
+        <input id="app-node-name" type="text" data-i18n-ph="cfg.nodeNamePh" placeholder="name (optional)">
+        <input id="app-node-addr" type="text" data-i18n-ph="cfg.nodeAddrPh" placeholder="host:7681">
+        <button type="submit" data-i18n="cfg.addNode">Add</button>
+      </form>
       <ul id="node-list"></ul>
       <div id="sidebar-footer">
         <div class="footer-row">

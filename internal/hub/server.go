@@ -368,10 +368,22 @@ func (s *Server) handleEditNode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRemoveNode(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	// A reverse node with a live control channel would just re-register on
+	// its next reconnect, so deleting it is rejected; clear the hub address
+	// on the node instead. An offline reverse node can be removed normally.
+	// The session check runs before nodesMu is taken: registerAgent takes
+	// sessionsMu first and nodesMu second, so this keeps the lock order.
+	if _, ok := s.agentSessionFor(id); ok {
+		writeError(w, http.StatusConflict, errors.New("cannot remove a connected reverse node; clear the hub address on the node instead"))
+		return
+	}
+
 	s.nodesMu.Lock()
 	idx := -1
 	for i, n := range s.nodes {
-		if n.ID == r.PathValue("id") {
+		if n.ID == id {
 			idx = i
 			break
 		}
