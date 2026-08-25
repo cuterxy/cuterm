@@ -44,11 +44,15 @@ for platform in arm384 hnd; do
   tar -czf "$outdir/$MODULE.tar.gz" -C "$pkg" "$MODULE"
   # Guard the layout: GNU cp has already shipped a nested cutermhub/cutermhub/
   # here once, which put install.sh below the installer's find depth.
-  tar -tzf "$outdir/$MODULE.tar.gz" | grep -qx "$MODULE/install.sh" &&
-    tar -tzf "$outdir/$MODULE.tar.gz" | grep -qx "$MODULE/webs/Module_$MODULE.asp" || {
-    echo "FATAL: tarball must contain $MODULE/install.sh and $MODULE/webs/Module_$MODULE.asp" >&2
-    exit 1
-  }
+  # NOTE: read the listing into a variable first — piping tar straight into
+  # grep -q is a SIGPIPE race that pipefail turns into a spurious failure.
+  listing="$(tar -tzf "$outdir/$MODULE.tar.gz")"
+  for want in "$MODULE/install.sh" "$MODULE/webs/Module_$MODULE.asp"; do
+    grep -qx "$want" <<<"$listing" || {
+      echo "FATAL: tarball missing $want" >&2
+      exit 1
+    }
+  done
   echo "-> $outdir/$MODULE.tar.gz"
 done
 
