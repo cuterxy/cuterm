@@ -23,8 +23,6 @@ import (
 
 	"github.com/cuterxy/cuterm/internal/autostart"
 	"github.com/cuterxy/cuterm/internal/hub"
-
-	"github.com/getlantern/systray"
 )
 
 // version is stamped at build time via -ldflags "-X main.version=...".
@@ -105,7 +103,7 @@ func main() {
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sigc
-		systray.Quit()
+		requestQuit()
 	}()
 
 	if err := svc.Listen(*addr); err != nil {

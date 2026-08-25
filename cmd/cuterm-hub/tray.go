@@ -1,3 +1,5 @@
+//go:build !headless
+
 package main
 
 import (
@@ -51,6 +53,10 @@ func traySetLanguage(lang string) {
 	default:
 	}
 }
+
+// requestQuit asks the tray event loop to exit; called from the SIGINT /
+// SIGTERM handler in main.
+func requestQuit() { systray.Quit() }
 
 // runTray shows the system tray icon and blocks on the main goroutine until
 // the user quits from the tray menu. appURL and configURL return the current

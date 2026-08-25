@@ -94,6 +94,8 @@ Release 同样发布 cuterm-hub 的各类包（同样的命名、加 `cuterm-hub
 go build -o cuterm-hub ./cmd/cuterm-hub
 ```
 
+也可以把 cuterm-hub 装到路由器上：`packaging/merlin/` 提供 koolshare 软件中心（梅林改 384/386 与梅林改/官改 hnd/axhnd）离线插件包的构建脚本，产物可直接在软件中心「离线安装」中上传安装，详见 [packaging/merlin/README.md](packaging/merlin/README.md)。
+
 ### Hub HTTP API
 
 hub 提供与 cuterm 相同的设置接口（`/api/port`、`/api/appearance`、`/api/language`、`/api/autostart`、`/api/version`），并新增：

@@ -94,6 +94,8 @@ Releases publish cuterm-hub too (same artifact names with the `cuterm-hub-` pref
 go build -o cuterm-hub ./cmd/cuterm-hub
 ```
 
+cuterm-hub can also run on a router: `packaging/merlin/` builds offline plugin packages for the koolshare software center (Merlin 384/386 and hnd/axhnd firmwares), installable via the software center's offline upload — see [packaging/merlin/README.md](packaging/merlin/README.md).
+
 ### Hub HTTP API
 
 The hub serves the same settings endpoints as cuterm (`/api/port`, `/api/appearance`, `/api/language`, `/api/autostart`, `/api/version`) and adds:
