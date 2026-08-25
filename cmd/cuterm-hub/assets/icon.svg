@@ -10,7 +10,7 @@
   <rect x="0" y="0" width="1024" height="1024" rx="224" fill="url(#bg)"/>
 
   <!-- lettermark: c u -->
-  <g fill="none" stroke="#4e88c9" stroke-width="95" stroke-linecap="round">
+  <g fill="none" stroke="#ffd700" stroke-width="95" stroke-linecap="round">
     <!-- c: open ring, gap on the right -->
     <path d="M 440 404 A 130 130 0 1 0 440 616"/>
     <!-- u: two stems joined by a bottom arc -->
