@@ -122,6 +122,7 @@ func New(staticFS fs.FS, nodes []Node) *Server {
 	}
 	s.mux.Handle("GET /api/nodes", http.HandlerFunc(s.handleListNodes))
 	s.mux.Handle("POST /api/nodes", http.HandlerFunc(s.handleAddNode))
+	s.mux.Handle("PUT /api/nodes/order", http.HandlerFunc(s.handleOrderNodes))
 	s.mux.Handle("PATCH /api/nodes/{id}", http.HandlerFunc(s.handleEditNode))
 	s.mux.Handle("DELETE /api/nodes/{id}", http.HandlerFunc(s.handleRemoveNode))
 	s.mux.Handle("GET /api/nodes/{id}/terminals", http.HandlerFunc(s.proxyToNode))
@@ -374,6 +375,61 @@ func (s *Server) handleEditNode(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, node)
+}
+
+type orderRequest struct {
+	IDs []string `json:"ids"`
+}
+
+// handleOrderNodes reorders the registry: the nodes named in the request
+// take their existing slots in the given sequence, while nodes not named
+// (e.g. hidden ones the app page does not show) keep their positions.
+func (s *Server) handleOrderNodes(w http.ResponseWriter, r *http.Request) {
+	var req orderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	s.nodesMu.Lock()
+	byID := make(map[string]Node, len(s.nodes))
+	for _, n := range s.nodes {
+		byID[n.ID] = n
+	}
+	queue := make([]Node, 0, len(req.IDs))
+	seen := make(map[string]bool, len(req.IDs))
+	for _, id := range req.IDs {
+		if seen[id] {
+			s.nodesMu.Unlock()
+			writeError(w, http.StatusBadRequest, fmt.Errorf("duplicate node id: %s", id))
+			return
+		}
+		seen[id] = true
+		n, ok := byID[id]
+		if !ok {
+			s.nodesMu.Unlock()
+			writeError(w, http.StatusNotFound, fmt.Errorf("node not found: %s", id))
+			return
+		}
+		queue = append(queue, n)
+	}
+	next := 0
+	for i, n := range s.nodes {
+		if seen[n.ID] {
+			s.nodes[i] = queue[next]
+			next++
+		}
+	}
+	nodes := append([]Node(nil), s.nodes...)
+	s.nodesMu.Unlock()
+
+	if s.OnNodesChange != nil {
+		if err := s.OnNodesChange(nodes); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleRemoveNode(w http.ResponseWriter, r *http.Request) {

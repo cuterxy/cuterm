@@ -27,6 +27,7 @@
   var nodes = []; // last fetched node statuses
   var termsByNode = {}; // nodeId -> last fetched terminal list
   var collapsedNodes = {}; // nodeId -> true when the terminal list is collapsed
+  var draggedNodeId = null; // node id being dragged, while a reorder drag runs
 
   // Terminal display settings, kept in sync with the hub config so that
   // changes made on the config page apply here without a reload.
@@ -190,9 +191,74 @@
     return li;
   }
 
+  // Move the dragged node before/after the target among the visible nodes,
+  // then persist the new order. Hidden nodes keep their registry slots
+  // (the server does the same), so they simply ride along.
+  function reorderNode(dragId, targetId, after) {
+    if (dragId === targetId) return;
+    var byId = {};
+    nodes.forEach(function (n) { byId[n.id] = n; });
+    var order = [];
+    nodes.forEach(function (n) {
+      if (!n.hidden && n.id !== dragId) order.push(n.id);
+    });
+    var at = order.indexOf(targetId);
+    if (at < 0) return;
+    order.splice(after ? at + 1 : at, 0, dragId);
+
+    var queue = order.slice();
+    nodes = nodes.map(function (n) {
+      return n.hidden ? n : byId[queue.shift()];
+    });
+    renderList();
+
+    fetch('/api/nodes/order', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: order })
+    }).then(function (r) {
+      if (!r.ok) refresh(); // server rejected the order; resync
+    }).catch(function () { refresh(); });
+  }
+
+  function clearDropMark(li) {
+    li.classList.remove('drop-before');
+    li.classList.remove('drop-after');
+  }
+
   function renderNode(node) {
     var li = document.createElement('li');
     li.className = 'node';
+
+    // Drag to reorder the node list.
+    li.draggable = true;
+    li.addEventListener('dragstart', function (ev) {
+      draggedNodeId = node.id;
+      ev.dataTransfer.effectAllowed = 'move';
+      ev.dataTransfer.setData('text/plain', node.id);
+    });
+    li.addEventListener('dragend', function () {
+      draggedNodeId = null;
+      // A cancelled drag may leave the mark on some other node's item.
+      Array.prototype.forEach.call(nodeList.querySelectorAll('.node'), clearDropMark);
+    });
+    li.addEventListener('dragover', function (ev) {
+      if (!draggedNodeId || draggedNodeId === node.id) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = 'move';
+      var rect = li.getBoundingClientRect();
+      var before = ev.clientY < rect.top + rect.height / 2;
+      li.classList.toggle('drop-before', before);
+      li.classList.toggle('drop-after', !before);
+    });
+    li.addEventListener('dragleave', function () { clearDropMark(li); });
+    li.addEventListener('drop', function (ev) {
+      ev.preventDefault();
+      var rect = li.getBoundingClientRect();
+      var after = ev.clientY >= rect.top + rect.height / 2;
+      clearDropMark(li);
+      if (draggedNodeId) reorderNode(draggedNodeId, node.id, after);
+    });
 
     var head = document.createElement('div');
     head.className = 'node-head';
