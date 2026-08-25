@@ -35,7 +35,9 @@ for platform in arm384 hnd; do
   echo "$platform" > "$pkg/$MODULE/.valid"
   outdir="$OUT/$([ "$platform" = arm384 ] && echo arm || echo hnd)"
   mkdir -p "$outdir"
-  tar -czf "$outdir/$MODULE.tar.gz" -C "$pkg" "$MODULE"
+  # The software center extracts the tarball into /tmp and runs /tmp/install.sh,
+  # so the layout must be flat: install.sh, bin/, scripts/... at the root.
+  tar -czf "$outdir/$MODULE.tar.gz" -C "$pkg/$MODULE" .
   echo "-> $outdir/$MODULE.tar.gz"
 done
 

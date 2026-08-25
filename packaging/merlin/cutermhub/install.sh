@@ -7,8 +7,9 @@ MODEL=
 UI_TYPE=ASUSWRT
 FW_TYPE_CODE=
 FW_TYPE_NAME=
-DIR=$(cd $(dirname $0); pwd)
-module=${DIR##*/}
+# 软件中心离线安装把压缩包解压到 /tmp 后执行 /tmp/install.sh（扁平结构），
+# 因此模块名不能从 $0 推导，且安装文件都位于 /tmp 根部。
+module=cutermhub
 
 get_model(){
 	local ODMPID=$(nvram get odmpid)
@@ -97,16 +98,21 @@ get_ui_type(){
 
 exit_install(){
 	local state=$1
+	# 清理解压到 /tmp 的安装文件（与软件中心 ks_tar_install.sh 的 clean 列表一致）
+	clean_tmp(){
+		rm -rf /tmp/bin /tmp/res /tmp/scripts /tmp/webs \
+			/tmp/install.sh /tmp/uninstall.sh /tmp/.valid /tmp/version >/dev/null 2>&1
+	}
 	case $state in
 		1)
 			echo_date "本插件适用于【koolshare 梅林改 384/386、梅林改/官改 hnd/axhnd/axhnd.675x】固件平台（1.5 代软件中心）！"
 			echo_date "你的固件平台不能安装！！!"
 			echo_date "退出安装！"
-			rm -rf /tmp/${module}* >/dev/null 2>&1
+			clean_tmp
 			exit 1
 			;;
 		0|*)
-			rm -rf /tmp/${module}* >/dev/null 2>&1
+			clean_tmp
 			exit 0
 			;;
 	esac
@@ -134,7 +140,7 @@ install_now(){
 	# default value
 	local TITLE="cuterm-hub"
 	local DESCR="cuterm 多节点终端管理"
-	local PLVER=$(cat ${DIR}/version)
+	local PLVER=$(cat /tmp/version)
 
 	# stop first
 	local ENABLE=$(dbus get ${module}_enable)
@@ -150,11 +156,11 @@ install_now(){
 	# install file
 	echo_date "安装插件相关文件..."
 	cd /tmp
-	cp -rf /tmp/${module}/bin/* /koolshare/bin/
-	cp -rf /tmp/${module}/res/* /koolshare/res/
-	cp -rf /tmp/${module}/scripts/* /koolshare/scripts/
-	cp -rf /tmp/${module}/webs/* /koolshare/webs/
-	cp -rf /tmp/${module}/uninstall.sh /koolshare/scripts/uninstall_${module}.sh
+	cp -rf /tmp/bin/* /koolshare/bin/
+	cp -rf /tmp/res/* /koolshare/res/
+	cp -rf /tmp/scripts/* /koolshare/scripts/
+	cp -rf /tmp/webs/* /koolshare/webs/
+	cp -rf /tmp/uninstall.sh /koolshare/scripts/uninstall_${module}.sh
 
 	# Permissions
 	chmod 755 /koolshare/scripts/${module}_*.sh >/dev/null 2>&1

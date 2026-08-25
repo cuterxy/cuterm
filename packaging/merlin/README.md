@@ -61,7 +61,9 @@ packaging/merlin/
 ```
 
 构建时 `build.sh` 会额外生成 `version`、`.valid`，并把编译好的二进制放入
-`bin/cuterm-hub`，再打成 `cutermhub.tar.gz`（包内顶层目录为 `cutermhub/`）。
+`bin/cuterm-hub`，再打成 `cutermhub.tar.gz`。包内为扁平结构（`install.sh`、
+`bin/`、`scripts/` 等位于压缩包根部），因为软件中心离线安装会把压缩包解压到
+`/tmp` 后直接执行 `/tmp/install.sh`。
 
 ## 无头构建
 
