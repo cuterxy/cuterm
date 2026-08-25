@@ -84,8 +84,11 @@ FunctionEnd
 
 Section "Install"
   SetOutPath $INSTDIR
-  File "..\dist\cuterm-hub-v${VERSION}-windows-amd64.exe"
-  Rename "$INSTDIR\cuterm-hub-v${VERSION}-windows-amd64.exe" "$INSTDIR\cuterm-hub.exe"
+  ; Install directly as cuterm-hub.exe — File overwrites any old version
+  ; (Rename would silently fail when the target already exists).
+  ; Also drop versioned binaries left behind by older installers.
+  Delete "$INSTDIR\cuterm-hub-v*-windows-amd64.exe"
+  File /oname=cuterm-hub.exe "..\dist\cuterm-hub-v${VERSION}-windows-amd64.exe"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\cuterm-hub"
@@ -108,6 +111,8 @@ SectionEnd
 Section "Uninstall"
   Delete "$INSTDIR\cuterm-hub.exe"
   Delete "$INSTDIR\uninstall.exe"
+  ; Clean up versioned binaries left behind by older installers.
+  Delete "$INSTDIR\cuterm-hub-v*-windows-amd64.exe"
   RMDir "$INSTDIR"
 
   Delete "$SMPROGRAMS\cuterm-hub\cuterm-hub.lnk"

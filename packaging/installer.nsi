@@ -84,8 +84,11 @@ FunctionEnd
 
 Section "Install"
   SetOutPath $INSTDIR
-  File "..\dist\cuterm-v${VERSION}-windows-amd64.exe"
-  Rename "$INSTDIR\cuterm-v${VERSION}-windows-amd64.exe" "$INSTDIR\cuterm.exe"
+  ; Install directly as cuterm.exe — File overwrites any old version
+  ; (Rename would silently fail when the target already exists).
+  ; Also drop versioned binaries left behind by older installers.
+  Delete "$INSTDIR\cuterm-v*-windows-amd64.exe"
+  File /oname=cuterm.exe "..\dist\cuterm-v${VERSION}-windows-amd64.exe"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
   CreateDirectory "$SMPROGRAMS\cuterm"
@@ -108,6 +111,8 @@ SectionEnd
 Section "Uninstall"
   Delete "$INSTDIR\cuterm.exe"
   Delete "$INSTDIR\uninstall.exe"
+  ; Clean up versioned binaries left behind by older installers.
+  Delete "$INSTDIR\cuterm-v*-windows-amd64.exe"
   RMDir "$INSTDIR"
 
   Delete "$SMPROGRAMS\cuterm\cuterm.lnk"
