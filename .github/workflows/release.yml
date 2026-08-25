@@ -139,3 +139,32 @@ jobs:
             dist/*.zip
             dist/*-setup.exe
           fail_on_unmatched_files: true
+
+  # Merlin router plugin packages: pure cross-compile (no CGO / tray), so a
+  # single Linux runner can build both software center variants.
+  merlin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          check-latest: true
+
+      - name: Build Merlin plugin packages
+        run: ./packaging/merlin/build.sh "${{ github.ref_name }}"
+
+      # Give the two packages distinct, versioned asset names; the software
+      # center's offline install locates install.sh inside the archive
+      # regardless of the file name.
+      - name: Rename release assets
+        run: |
+          cp dist/merlin/arm/cutermhub.tar.gz "dist/merlin/cuterm-hub-${GITHUB_REF_NAME}-merlin-arm.tar.gz"
+          cp dist/merlin/hnd/cutermhub.tar.gz "dist/merlin/cuterm-hub-${GITHUB_REF_NAME}-merlin-hnd.tar.gz"
+
+      - name: Upload release asset (Merlin)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/merlin/cuterm-hub-*-merlin-*.tar.gz
+          fail_on_unmatched_files: true

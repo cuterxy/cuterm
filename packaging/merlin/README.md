@@ -24,6 +24,11 @@ armv8 机型同样运行 32 位用户态），仅 `.valid` 校验标记不同（
 
 产物为 `dist/merlin/{arm,hnd}/cutermhub.tar.gz`。
 
+正式发版无需手动构建：推送 `v*` 标签会触发 `.github/workflows/release.yml` 的
+`merlin` job，自动构建并作为 Release 资产上传，文件名分别为
+`cuterm-hub-<版本>-merlin-arm.tar.gz` 和 `cuterm-hub-<版本>-merlin-hnd.tar.gz`
+（软件中心离线安装只识别压缩包内的 install.sh，与文件名无关）。
+
 ## 安装与使用
 
 1. 路由器后台进入「软件中心 → 离线安装」，上传对应平台的 `cutermhub.tar.gz`。
