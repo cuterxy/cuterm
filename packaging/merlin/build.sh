@@ -29,7 +29,9 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -tags headless -trimpath \
 for platform in arm384 hnd; do
   pkg="$STAGE/$platform"
   mkdir -p "$pkg/$MODULE/bin"
-  cp -R "$TEMPLATE/" "$pkg/$MODULE/"
+  # "/." copies the template's contents on both BSD and GNU cp; a bare
+  # trailing slash nests the template directory itself under GNU cp.
+  cp -R "$TEMPLATE/." "$pkg/$MODULE/"
   cp "$STAGE/cuterm-hub" "$pkg/$MODULE/bin/cuterm-hub"
   echo "$VERSION" > "$pkg/$MODULE/version"
   echo "$platform" > "$pkg/$MODULE/.valid"
@@ -38,6 +40,11 @@ for platform in arm384 hnd; do
   # The software center extracts the tarball into /tmp and runs /tmp/install.sh,
   # so the layout must be flat: install.sh, bin/, scripts/... at the root.
   tar -czf "$outdir/$MODULE.tar.gz" -C "$pkg/$MODULE" .
+  # Guard the flat layout: the CI runner's GNU cp has shipped a nested
+  # cutermhub/ here before, which the software center rejects.
+  tar -tzf "$outdir/$MODULE.tar.gz" | grep -qx './install.sh' || {
+    echo "FATAL: install.sh missing from tarball root" >&2; exit 1;
+  }
   echo "-> $outdir/$MODULE.tar.gz"
 done
 
