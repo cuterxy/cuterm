@@ -37,13 +37,17 @@ for platform in arm384 hnd; do
   echo "$platform" > "$pkg/$MODULE/.valid"
   outdir="$OUT/$([ "$platform" = arm384 ] && echo arm || echo hnd)"
   mkdir -p "$outdir"
-  # The software center extracts the tarball into /tmp and runs /tmp/install.sh,
-  # so the layout must be flat: install.sh, bin/, scripts/... at the root.
-  tar -czf "$outdir/$MODULE.tar.gz" -C "$pkg/$MODULE" .
-  # Guard the flat layout: the CI runner's GNU cp has shipped a nested
-  # cutermhub/ here before, which the software center rejects.
-  tar -tzf "$outdir/$MODULE.tar.gz" | grep -qx './install.sh' || {
-    echo "FATAL: install.sh missing from tarball root" >&2; exit 1;
+  # The software center (armsoft & rogsoft ks_tar_install.sh) extracts the
+  # tarball into /tmp, locates the single install.sh (find -maxdepth 2), then
+  # requires <module>/webs/Module_<module>.asp and <module>/scripts/ next to
+  # it. So the tarball must carry the cutermhub/ directory, not its contents.
+  tar -czf "$outdir/$MODULE.tar.gz" -C "$pkg" "$MODULE"
+  # Guard the layout: GNU cp has already shipped a nested cutermhub/cutermhub/
+  # here once, which put install.sh below the installer's find depth.
+  tar -tzf "$outdir/$MODULE.tar.gz" | grep -qx "$MODULE/install.sh" &&
+    tar -tzf "$outdir/$MODULE.tar.gz" | grep -qx "$MODULE/webs/Module_$MODULE.asp" || {
+    echo "FATAL: tarball must contain $MODULE/install.sh and $MODULE/webs/Module_$MODULE.asp" >&2
+    exit 1
   }
   echo "-> $outdir/$MODULE.tar.gz"
 done
