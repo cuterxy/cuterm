@@ -35,6 +35,11 @@ type Node struct {
 	Name    string `json:"name"`
 	Addr    string `json:"addr"` // host:port, no scheme
 	Reverse bool   `json:"reverse,omitempty"`
+	// Hidden nodes stay registered but are not shown on the app page; the
+	// config page can re-enable them. Hiding is how a connected reverse node
+	// gets "removed": a real delete would not stick, as the node re-registers
+	// itself on its next reconnect.
+	Hidden bool `json:"hidden,omitempty"`
 }
 
 // NodeStatus is a Node plus its live reachability, as served by GET
@@ -265,8 +270,9 @@ func (s *Server) handleListNodes(w http.ResponseWriter, r *http.Request) {
 }
 
 type nodeRequest struct {
-	Name string `json:"name"`
-	Addr string `json:"addr"`
+	Name   string `json:"name"`
+	Addr   string `json:"addr"`
+	Hidden *bool  `json:"hidden"`
 }
 
 func (s *Server) handleAddNode(w http.ResponseWriter, r *http.Request) {
@@ -354,6 +360,9 @@ func (s *Server) handleEditNode(w http.ResponseWriter, r *http.Request) {
 		}
 		node.Name = name
 	}
+	if req.Hidden != nil {
+		node.Hidden = *req.Hidden
+	}
 	s.nodes[idx] = node
 	nodes := append([]Node(nil), s.nodes...)
 	s.nodesMu.Unlock()
@@ -371,14 +380,12 @@ func (s *Server) handleRemoveNode(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	// A reverse node with a live control channel would just re-register on
-	// its next reconnect, so deleting it is rejected; clear the hub address
-	// on the node instead. An offline reverse node can be removed normally.
-	// The session check runs before nodesMu is taken: registerAgent takes
-	// sessionsMu first and nodesMu second, so this keeps the lock order.
-	if _, ok := s.agentSessionFor(id); ok {
-		writeError(w, http.StatusConflict, errors.New("cannot remove a connected reverse node; clear the hub address on the node instead"))
-		return
-	}
+	// its next reconnect, so removing it only hides the node instead: it
+	// stays registered, invisible on the app page, and the config page can
+	// re-enable it. The session check runs before nodesMu is taken:
+	// registerAgent takes sessionsMu first and nodesMu second, so this keeps
+	// the lock order.
+	_, connected := s.agentSessionFor(id)
 
 	s.nodesMu.Lock()
 	idx := -1
@@ -393,7 +400,11 @@ func (s *Server) handleRemoveNode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, errNodeNotFound)
 		return
 	}
-	s.nodes = append(s.nodes[:idx], s.nodes[idx+1:]...)
+	if connected {
+		s.nodes[idx].Hidden = true
+	} else {
+		s.nodes = append(s.nodes[:idx], s.nodes[idx+1:]...)
+	}
 	nodes := append([]Node(nil), s.nodes...)
 	s.nodesMu.Unlock()
 

@@ -231,25 +231,23 @@
       collapsedNodes[node.id] = !collapsedNodes[node.id];
       renderList();
     });
-    // A connected reverse node is managed from the node side; it cannot be
-    // removed here (the hub API rejects it too).
-    if (!(node.reverse && node.online)) {
-      var removeBtn = document.createElement('button');
-      removeBtn.className = 'icon-btn close-btn';
-      removeBtn.title = t('cfg.removeNodeTitle');
-      removeBtn.textContent = '×';
-      removeBtn.addEventListener('click', function (ev) {
-        ev.stopPropagation();
-        removeNode(node.id).then(function () {
-          if (session && session.nodeId === node.id) detach();
-          delete termsByNode[node.id];
-          refresh();
-        }).catch(function (err) {
-          window.alert(t('cfg.nodeRemoveFail', { error: err.message }));
-        });
+    // Removing a connected reverse node hides it instead of deleting it: the
+    // hub keeps it registered and the config page can re-enable it.
+    var removeBtn = document.createElement('button');
+    removeBtn.className = 'icon-btn close-btn';
+    removeBtn.title = t('cfg.removeNodeTitle');
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+      removeNode(node.id).then(function () {
+        if (session && session.nodeId === node.id) detach();
+        delete termsByNode[node.id];
+        refresh();
+      }).catch(function (err) {
+        window.alert(t('cfg.nodeRemoveFail', { error: err.message }));
       });
-      head.appendChild(removeBtn);
-    }
+    });
+    head.appendChild(removeBtn);
     li.appendChild(head);
 
     var terms = termsByNode[node.id] || [];
@@ -267,6 +265,7 @@
   function renderList() {
     nodeList.innerHTML = '';
     nodes.forEach(function (node) {
+      if (node.hidden) return;
       nodeList.appendChild(renderNode(node));
     });
   }

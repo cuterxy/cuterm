@@ -111,7 +111,7 @@
 
   function renderNodeRow(node) {
     var li = document.createElement('li');
-    li.className = 'cfg-node';
+    li.className = 'cfg-node' + (node.hidden ? ' hidden-node' : '');
 
     var main = document.createElement('div');
     main.className = 'cfg-node-main';
@@ -126,33 +126,58 @@
     name.textContent = node.name;
     var sub = document.createElement('div');
     sub.className = 'sub';
-    sub.textContent = (node.reverse ? t('node.reverse') : node.addr) + (node.online ? '' : ' · ' + t('node.offline'));
+    sub.textContent = (node.reverse ? t('node.reverse') : node.addr) +
+      (node.online ? '' : ' · ' + t('node.offline')) +
+      (node.hidden ? ' · ' + t('node.hidden') : '');
     meta.appendChild(name);
     meta.appendChild(sub);
 
-    var removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'icon-btn close-btn';
-    removeBtn.title = t('cfg.removeNodeTitle');
-    removeBtn.textContent = '×';
-    removeBtn.addEventListener('click', function () {
-      fetch('/api/nodes/' + node.id, { method: 'DELETE' }).then(function (r) {
-        if (!r.ok) {
-          return r.json().then(function (data) {
-            throw new Error(data.error || ('failed: ' + r.status));
-          });
-        }
-        loadNodes();
-      }).catch(function (err) {
-        window.alert(t('cfg.nodeRemoveFail', { error: err.message }));
-      });
-    });
-
     main.appendChild(dot);
     main.appendChild(meta);
-    // A connected reverse node is managed from the node side; the hub API
-    // rejects its removal, so hide the button here too.
-    if (!(node.reverse && node.online)) {
+    // A hidden node gets an enable button instead of a remove button: it was
+    // "removed" from the app page of a connected reverse node, which cannot
+    // be truly deleted while its tunnel is up.
+    if (node.hidden) {
+      var enableBtn = document.createElement('button');
+      enableBtn.type = 'button';
+      enableBtn.className = 'icon-btn';
+      enableBtn.title = t('cfg.enableNodeTitle');
+      enableBtn.textContent = '↩';
+      enableBtn.addEventListener('click', function () {
+        fetch('/api/nodes/' + node.id, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ hidden: false })
+        }).then(function (r) {
+          if (!r.ok) {
+            return r.json().then(function (data) {
+              throw new Error(data.error || ('failed: ' + r.status));
+            });
+          }
+          loadNodes();
+        }).catch(function (err) {
+          window.alert(t('cfg.nodeEnableFail', { error: err.message }));
+        });
+      });
+      main.appendChild(enableBtn);
+    } else {
+      var removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'icon-btn close-btn';
+      removeBtn.title = t('cfg.removeNodeTitle');
+      removeBtn.textContent = '×';
+      removeBtn.addEventListener('click', function () {
+        fetch('/api/nodes/' + node.id, { method: 'DELETE' }).then(function (r) {
+          if (!r.ok) {
+            return r.json().then(function (data) {
+              throw new Error(data.error || ('failed: ' + r.status));
+            });
+          }
+          loadNodes();
+        }).catch(function (err) {
+          window.alert(t('cfg.nodeRemoveFail', { error: err.message }));
+        });
+      });
       main.appendChild(removeBtn);
     }
     li.appendChild(main);

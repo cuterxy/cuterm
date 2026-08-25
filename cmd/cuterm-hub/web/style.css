@@ -557,6 +557,10 @@ body {
   border-bottom: none;
 }
 
+.cfg-node.hidden-node .meta {
+  opacity: 0.5;
+}
+
 .cfg-node-main {
   display: flex;
   align-items: center;
