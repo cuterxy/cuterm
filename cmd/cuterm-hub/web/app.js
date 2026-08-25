@@ -23,7 +23,7 @@
   var termContainer = document.getElementById('terminal');
 
   // Currently attached session, or null when no terminal is selected.
-  var session = null; // {nodeId, id, term, fitAddon, ws, closedByUs, onDetach}
+  var session = null; // {nodeId, id, term, fitAddon, ws, closedByUs, onDetach, shell}
   var nodes = []; // last fetched node statuses
   var termsByNode = {}; // nodeId -> last fetched terminal list
   var collapsedNodes = {}; // nodeId -> true when the terminal list is collapsed
@@ -489,6 +489,7 @@
     for (var i = 0; i < terms.length; i++) {
       if (terms[i].id === id) { info = terms[i]; break; }
     }
+    session.shell = info ? info.shell : '';
     document.title = (info ? info.name : id) + ' - cuterm-hub';
     renderList();
     term.focus();
@@ -526,6 +527,42 @@
   }
 
   /* ---------- events ---------- */
+
+  // Quote a dropped file's name for the attached terminal's shell. Browsers
+  // never expose a dropped file's path, only its name, so the name is all we
+  // can type. Note the shell may run on a remote node where the local file
+  // doesn't exist.
+  function quoteFileName(name) {
+    var base = ((session && session.shell) || '').split(/[\\/]/).pop().toLowerCase();
+    if (base.indexOf('cmd') === 0) {
+      // cmd.exe: double quotes; an embedded " can't be escaped, rare enough
+      // to leave as-is.
+      return '"' + name + '"';
+    }
+    if (base.indexOf('powershell') === 0 || base.indexOf('pwsh') === 0) {
+      return "'" + name.replace(/'/g, "''") + "'";
+    }
+    return "'" + name.replace(/'/g, "'\\''") + "'";
+  }
+
+  // Swallow every drop so the browser doesn't navigate away to open the
+  // file; drops landing on the terminal type the quoted file name(s) into it.
+  document.addEventListener('dragover', function (ev) {
+    ev.preventDefault();
+  });
+  document.addEventListener('drop', function (ev) {
+    ev.preventDefault();
+    if (!session || !session.ws || session.ws.readyState !== WebSocket.OPEN) return;
+    if (!termWrap.contains(ev.target)) return;
+    var files = ev.dataTransfer ? ev.dataTransfer.files : null;
+    if (!files || files.length === 0) return;
+    var names = [];
+    for (var i = 0; i < files.length; i++) {
+      names.push(quoteFileName(files[i].name));
+    }
+    sendFrame(session.ws, FRAME_INPUT, new TextEncoder().encode(names.join(' ')));
+    session.term.focus();
+  });
 
   document.getElementById('lang-toggle').addEventListener('click', function (ev) {
     ev.preventDefault();
