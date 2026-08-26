@@ -33,7 +33,9 @@ for platform in arm384 hnd; do
   # trailing slash nests the template directory itself under GNU cp.
   cp -R "$TEMPLATE/." "$pkg/$MODULE/"
   cp "$STAGE/cuterm-hub" "$pkg/$MODULE/bin/cuterm-hub"
-  echo "$VERSION" > "$pkg/$MODULE/version"
+  # The software center plugin list prepends its own "v" to the version, so
+  # the version file carries the bare number ("1.2.5", not "v1.2.5").
+  echo "${VERSION#v}" > "$pkg/$MODULE/version"
   echo "$platform" > "$pkg/$MODULE/.valid"
   outdir="$OUT/$([ "$platform" = arm384 ] && echo arm || echo hnd)"
   mkdir -p "$outdir"
