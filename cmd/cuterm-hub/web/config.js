@@ -134,6 +134,34 @@
 
     main.appendChild(dot);
     main.appendChild(meta);
+
+    var renameBtn = document.createElement('button');
+    renameBtn.type = 'button';
+    renameBtn.className = 'icon-btn';
+    renameBtn.title = t('cfg.renameNodeTitle');
+    renameBtn.textContent = '✎';
+    renameBtn.addEventListener('click', function () {
+      var name = window.prompt(t('cfg.nodeRenamePrompt'), node.name);
+      if (name === null) return;
+      name = name.trim();
+      if (!name || name === node.name) return;
+      fetch('/api/nodes/' + node.id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name })
+      }).then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (data) {
+            throw new Error(data.error || ('failed: ' + r.status));
+          });
+        }
+        loadNodes();
+      }).catch(function (err) {
+        window.alert(t('cfg.nodeRenameFail', { error: err.message }));
+      });
+    });
+    main.appendChild(renameBtn);
+
     // A hidden node gets an enable button instead of a remove button: it was
     // "removed" from the app page of a connected reverse node, which cannot
     // be truly deleted while its tunnel is up.
